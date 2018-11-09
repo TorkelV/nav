@@ -1,0 +1,36 @@
+//language popularity
+select keyword, count(keyword) as c
+  from keywords where keyword in ('C#', 'Java', 'JavaScript', 'C', 'C++', 'Clojure',
+   'PHP', 'SQL', 'CSS', 'HTML', 'Python', 'R', 'Ruby', 'Kotlin', 'Scala', 'TypeScript',
+    'Go', 'F#', 'Lua', 'Objective C', 'Haskell', 'Groovy', 'Nim', 'Swift', 'Cobol', 'ClojureScript')
+   group by keyword order by c desc
+
+
+//precentage use of keyword by year
+select keyword, j.year, c as freq, round((c::numeric)/(c2::numeric),4)*100 as precent from (
+select keyword, year, count(keyword) as c 
+from keywords
+inner join ads on keywords.ad_id = ads.ad_id
+where keyword = 'JSP'
+group by year, keyword
+order by c desc ) j
+inner join (select count(ad_id) c2, year from ads group by year) j2 on j2.year = j.year
+order by precent desc
+
+//precentage use of keyword by year for ads with keywords
+select keyword, c as freq,j.year, round((c::numeric)/(c2::numeric),4)*100 as precent from (
+select keyword, year, count(keyword) as c 
+from keywords
+inner join ads on keywords.ad_id = ads.ad_id
+where keyword = 'React'
+group by year, keyword
+order by c desc ) j
+inner join (select count(ads.ad_id) c2, year from ads where ad_id in (select ad_id from keywords) group by year) j2 on j2.year = j.year
+order by year asc
+
+
+//ads without keywords
+select title,description,year from descs 
+inner join ads on ads.ad_id = descs.ad_id
+where descs.ad_id not in(select ad_id from keywords) 
+and year='2018'
