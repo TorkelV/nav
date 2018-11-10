@@ -141,10 +141,10 @@
 
 (defn save-keywords [keywords]
   (let [a (sql/query db ["select ad_id, concat(title,' ',description) as description from descs"])]
-  (->> (map #(vec [(first %) (map :ad_id (filter-ads-regex (last %) :description a))]) keywords)
-       (map (fn [v] (map #(assoc '{} :keyword (first v) :ad_id %) (last v))))
-       (apply concat)
-       (sql/insert-multi! db :keywords))))
+    (->> (map #(vec [(first %) (map :ad_id (filter-ads-regex (last %) :description a))]) keywords)
+         (map (fn [v] (map #(assoc '{} :keyword (first v) :ad_id %) (last v))))
+         (apply concat)
+         (sql/insert-multi! db :keywords))))
 
 (defn rename-keys-ads [ads]
   (clojure.set/rename-keys ads {"Bedrift Naring Primar Kode" :industry_code
@@ -180,11 +180,11 @@
                                 }))
 
 (defn rename-keys-texts [texts]
-  (clojure.set/rename-keys texts {"Stillingsnummer nav no" :ad_id_nav
-                                "Stilling Id" :ad_id
-                                "Tittel vasket" :title
-                                "Stillingsbeskrivelse vasket" :description
-                                }))
+  (clojure.set/rename-keys texts {"Stillingsnummer nav no"      :ad_id_nav
+                                  "Stilling Id"                 :ad_id
+                                  "Tittel vasket"               :title
+                                  "Stillingsbeskrivelse vasket" :description
+                                  }))
 
 
 
@@ -216,3 +216,30 @@
        (distinct-by :ad_id)
        (remove #(nil? (:ad_id %)))
        (map #(update % :description clean-html))))
+
+(defn pop-by-year []
+  (->>(sql/query db ["select keyword, c as freq,j.year, round((c::numeric)/(c2::numeric),4)*100 as precent, array_agg(distinct ads.orgnr) from (\nselect keyword, year, count(keyword) as c \nfrom keywords\ninner join ads on keywords.ad_id = ads.ad_id\ngroup by year, keyword\norder by c desc ) j\ninner join (select count(ads.ad_id) c2, year from ads group by year) j2 on j2.year = j.year\ninner join ads on j.year = ads.year and j.keyword in (select keyword from keywords where keywords.ad_id = ads.ad_id) \ngroup by keyword, freq, j.year, precent\norder by year asc"])
+      (group-by :keyword)))
+
+(defn pop-by-year-w []
+  (->>(sql/query db ["select keyword, c as freq,j.year, round((c::numeric)/(c2::numeric),4)*100 as precent, array_agg(distinct ads.orgnr) from (\nselect keyword, year, count(keyword) as c \nfrom keywords\ninner join ads on keywords.ad_id = ads.ad_id\ngroup by year, keyword\norder by c desc ) j\ninner join (select count(ads.ad_id) c2, year from ads where ad_id in (select ad_id from keywords) group by year) j2 on j2.year = j.year\ninner join ads on j.year = ads.year and j.keyword in (select keyword from keywords where keywords.ad_id = ads.ad_id) \ngroup by keyword, freq, j.year, precent\norder by year asc"])
+      (group-by :keyword)))
+
+
+(defn app []
+  (routes
+    (GET "/popularity-year/" []
+      {:status  200
+       :headers {"Content-Type" "application/json" "Access-Control-Allow-Origin" "*"}
+       :body    (json/write-str (pop-by-year))})
+    (GET "/popularity-year-w/" []
+      {:status  200
+       :headers {"Content-Type" "application/json" "Access-Control-Allow-Origin" "*"}
+       :body    (json/write-str (pop-by-year-w))})))
+
+
+(defn create-server []
+  (server/run-server (app) {:port 8080}))
+
+(defn -main [& args]
+  (create-server))

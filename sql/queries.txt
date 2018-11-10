@@ -1,3 +1,9 @@
+//ads without keywords
+select title,description,year from descs 
+inner join ads on ads.ad_id = descs.ad_id
+where descs.ad_id not in(select ad_id from keywords) 
+and year='2018'
+
 //language popularity
 select keyword, count(keyword) as c
   from keywords where keyword in ('C#', 'Java', 'JavaScript', 'C', 'C++', 'Clojure',
@@ -28,9 +34,29 @@ order by c desc ) j
 inner join (select count(ads.ad_id) c2, year from ads where ad_id in (select ad_id from keywords) group by year) j2 on j2.year = j.year
 order by year asc
 
+//precentage use of keyword by year for ads with keywords. Join organization numbers
+select keyword, c as freq,j.year, round((c::numeric)/(c2::numeric),4)*100 as precent, array_agg(distinct ads.orgnr) from (
+select keyword, year, count(keyword) as c 
+from keywords
+inner join ads on keywords.ad_id = ads.ad_id
+group by year, keyword
+order by c desc ) j
+inner join (select count(ads.ad_id) c2, year from ads where ad_id in (select ad_id from keywords) group by year) j2 on j2.year = j.year
+inner join ads on j.year = ads.year and j.keyword in (select keyword from keywords where keywords.ad_id = ads.ad_id) 
+group by keyword, freq, j.year, precent
+order by year asc
 
-//ads without keywords
-select title,description,year from descs 
-inner join ads on ads.ad_id = descs.ad_id
-where descs.ad_id not in(select ad_id from keywords) 
-and year='2018'
+//keywords for each business
+select a.business_orgnr, array_agg(distinct a.business_name) as orgnames,  array_agg(distinct k.keyword) as keywords from keywords k inner join ads a on a.ad_id = k.ad_id
+group by a.business_orgnr
+order by orgnames
+
+//daughter companies
+select business_orgnr,array_agg(distinct orgnr) from ads
+group by business_orgnr
+
+//daughter companies with keywords for business
+select ads.orgnr, array_agg(keyword) from keywords 
+inner join ads on ads.ad_id = keywords.ad_id 
+where ads.ad_id in (select ad_id from ads where business_orgnr = '814780422')
+group by orgnr
