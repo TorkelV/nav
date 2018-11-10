@@ -3,11 +3,12 @@
             [org.httpkit.client :as http]
             [hickory.core :as hick]
             [hickory.select :as s]
-            [compojure.core :refer [routes POST GET ANY]]
+            [compojure.core :refer :all]
             [clojure.data.json :as json]
             [clojure.java.jdbc :as sql]
             [clojure.string :as cstr]
-            [clojure-csv.core :as csv]))
+            [clojure-csv.core :as csv]
+            [compojure.route :as route]))
 
 (def db "postgresql://localhost:5432/nav?user=postgres&password=123")
 
@@ -218,28 +219,26 @@
        (map #(update % :description clean-html))))
 
 (defn pop-by-year []
-  (->>(sql/query db ["select keyword, c as freq,j.year, round((c::numeric)/(c2::numeric),4)*100 as precent, array_agg(distinct ads.orgnr) from (\nselect keyword, year, count(keyword) as c \nfrom keywords\ninner join ads on keywords.ad_id = ads.ad_id\ngroup by year, keyword\norder by c desc ) j\ninner join (select count(ads.ad_id) c2, year from ads group by year) j2 on j2.year = j.year\ninner join ads on j.year = ads.year and j.keyword in (select keyword from keywords where keywords.ad_id = ads.ad_id) \ngroup by keyword, freq, j.year, precent\norder by year asc"])
-      (group-by :keyword)))
+  (->> (sql/query db ["select keyword, c as freq,j.year, round((c::numeric)/(c2::numeric),4)*100 as precent, array_agg(distinct ads.orgnr) from (\nselect keyword, year, count(keyword) as c \nfrom keywords\ninner join ads on keywords.ad_id = ads.ad_id\ngroup by year, keyword\norder by c desc ) j\ninner join (select count(ads.ad_id) c2, year from ads group by year) j2 on j2.year = j.year\ninner join ads on j.year = ads.year and j.keyword in (select keyword from keywords where keywords.ad_id = ads.ad_id) \ngroup by keyword, freq, j.year, precent\norder by year asc"])
+       (group-by :keyword)))
 
 (defn pop-by-year-w []
-  (->>(sql/query db ["select keyword, c as freq,j.year, round((c::numeric)/(c2::numeric),4)*100 as precent, array_agg(distinct ads.orgnr) from (\nselect keyword, year, count(keyword) as c \nfrom keywords\ninner join ads on keywords.ad_id = ads.ad_id\ngroup by year, keyword\norder by c desc ) j\ninner join (select count(ads.ad_id) c2, year from ads where ad_id in (select ad_id from keywords) group by year) j2 on j2.year = j.year\ninner join ads on j.year = ads.year and j.keyword in (select keyword from keywords where keywords.ad_id = ads.ad_id) \ngroup by keyword, freq, j.year, precent\norder by year asc"])
-      (group-by :keyword)))
+  (->> (sql/query db ["select keyword, c as freq,j.year, round((c::numeric)/(c2::numeric),4)*100 as precent, array_agg(distinct ads.orgnr) from (\nselect keyword, year, count(keyword) as c \nfrom keywords\ninner join ads on keywords.ad_id = ads.ad_id\ngroup by year, keyword\norder by c desc ) j\ninner join (select count(ads.ad_id) c2, year from ads where ad_id in (select ad_id from keywords) group by year) j2 on j2.year = j.year\ninner join ads on j.year = ads.year and j.keyword in (select keyword from keywords where keywords.ad_id = ads.ad_id) \ngroup by keyword, freq, j.year, precent\norder by year asc"])
+       (group-by :keyword)))
 
 
-(defn app []
-  (routes
-    (GET "/popularity-year/" []
-      {:status  200
-       :headers {"Content-Type" "application/json" "Access-Control-Allow-Origin" "*"}
-       :body    (json/write-str (pop-by-year))})
-    (GET "/popularity-year-w/" []
-      {:status  200
-       :headers {"Content-Type" "application/json" "Access-Control-Allow-Origin" "*"}
-       :body    (json/write-str (pop-by-year-w))})))
+(defroutes app
+           (GET "/popularity-year/" []
+             {:status  200
+              :headers {"Content-Type" "application/json" "Access-Control-Allow-Origin" "*"}
+              :body    (json/write-str (pop-by-year))})
+           (GET "/popularity-year-w/" []
+             {:status  200
+              :headers {"Content-Type" "application/json" "Access-Control-Allow-Origin" "*"}
+              :body    (json/write-str (pop-by-year-w))})
+           (route/not-found "<h1>Page not found</h1>"))
 
 
 (defn create-server []
   (server/run-server (app) {:port 8080}))
 
-(defn -main [& args]
-  (create-server))
