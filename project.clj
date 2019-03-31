@@ -10,7 +10,7 @@
                  [compojure "1.6.1"]
                  [hickory "0.7.1"]
                  [ring "1.4.0-RC2"]
-                 [org.clojure/java.jdbc "0.6.1"]
+                 [org.clojure/java.jdbc "0.7.8"]
                  [org.postgresql/postgresql "9.4-1201-jdbc41"]
                  [org.clojure/data.json "0.2.6"]
                  [clojure-csv/clojure-csv "2.0.1"]]

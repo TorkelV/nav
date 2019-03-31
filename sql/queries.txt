@@ -46,10 +46,15 @@ inner join ads on j.year = ads.year and j.keyword in (select keyword from keywor
 group by keyword, freq, j.year, precent
 order by year asc
 
-//keywords for each business
-select a.business_orgnr, array_agg(distinct a.business_name) as orgnames,  array_agg(distinct k.keyword) as keywords from keywords k inner join ads a on a.ad_id = k.ad_id
+//businesses
+select  a.business_orgnr as business_orgnr, 
+		array_agg(distinct a.business_name) as business_names,
+		array_agg(distinct a.orgnr) as daughter_companies,
+		array_agg(distinct k.keyword) as keywords,
+		count(a.ad_id) as ads_posted
+from keywords k inner join ads a on a.ad_id = k.ad_id
 group by a.business_orgnr
-order by orgnames
+order by business_orgnr
 
 //daughter companies
 select business_orgnr,array_agg(distinct orgnr) from ads

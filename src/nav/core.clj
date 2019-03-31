@@ -12,6 +12,11 @@
 
 (def db "postgresql://localhost:5432/nav?user=postgres&password=123")
 
+
+(defn keywordize-keys [m]
+  (let [f (fn [[k v]] (if (string? k) [(keyword k) v] [k v]))]
+    (clojure.walk/postwalk (fn [x] (if (map? x) (into {} (map f x)) x)) m)))
+
 ;;https://crossclj.info/ns/org.clojure/clojurescript/1.10.312/cljs.util.html#_distinct-by
 (defn distinct-by
   ([f coll]
@@ -44,9 +49,9 @@
                    ["Kotlin" #"(?i)kotlin"]
                    ["R" #"[^A](/|\(|,|\s|\.)R(/|\s|\.|,|\))[^3]"]
                    ["SQL" #"(?i)SQL"]
-                   ["C#" #"(?i)(C.?#)|(C.?sharp)"]
-                   ["F#" #"(?i)(F.?#)|(F.?sharp)"]
-                   ["C++" #"(?i)c.?\+\+"]
+                   ["C Sharp" #"(?i)([^A-zæøå](C.?#|C.?(S|s)harp)[^A-zæøå])"]
+                   ["F Sharp" #"([^A-zæøå](F#|F.?(S|s)harp)[^A-zæøå])"]
+                   ["C++" #"(?i)[^A-zæøå]c.?\+\+"]
                    ["C" #"(/|\(|,|\s|\.)C(/|\s|\.|,|\))\s*[^s#+]"]
                    ["PHP" #"(?i)([^A-zæøå]php7?[^A-zæøå])"]
                    ["Ruby" #"(?i)([^A-zæøå]ruby[^A-zæøå])"]
@@ -84,28 +89,28 @@
                    ["TDD" #"(?i)([^A-zæøå](tdd|test.?driven.?development)[^A-zæøå])"]
                    ["Scrum" #"(?i)[^A-zæøå]scrum"]
                    ["Kanban" #"(?i)([^A-zæøå]kanban[^A-zæøå])"]
-                   ["AWS" #"(?i)([^A-zæøå](aws|amazon))"]
+                   ["AWS" #"(?i)([^A-zæøå]((aws)|(amazon.?web.?services))[^A-zæøå])"]
                    ["Azure" #"(?i)([^A-zæøå](azure)[^A-zæøå])"]
                    ["Guava" #"(?i)([^A-zæøå](guava)[^A-zæøå])"]
                    ["Linux" #"(?i)linux|ubuntu|unix"]
                    ["GIS" #"(?i)([^A-zæøå](gis)[^A-zæøå])"]
                    ["REST" #"([^A-zæøå](REST|Rest)[^A-zæøå])"]
-                   ["Machine Learning" #"(?i)([^A-zæøå](maskinlæring|ml|machine learning)[^A-zæøå])"]
+                   ["ML" #"(?i)([^A-zæøå](maskinlæring|ml|machine learning)[^A-zæøå])"]
                    ["NLP" #"(?i)[^A-zæøå](NLP|natural language (processing)?)[^A-zæøå]"]
-                   ["Artificial Intelligence" #"(?i)([^A-zæøå](ai|artificial intelligence|maskinlæring|ml|((machine|deep) learning)|NLP|natural language (processing)?)[^A-zæøå])"]
+                   ["AI" #"(?i)([^A-zæøå](ai|artificial intelligence|maskinlæring|ml|((machine|deep) learning)|NLP|natural language (processing)?)[^A-zæøå])"]
                    ["IOT" #"(?i)([^A-zæøå](iot|internet of things)[^A-zæøå])"]
                    ["Big Data" #"(?i)([^A-zæøå](big data|stordata)[^A-zæøå])"]
                    ["Unity" #"(?i)[^A-zæøå]unity"]
                    ["GraphQL" #"(?i)graphql"]
                    ["ETL" #"(?i)([^A-zæøå](etl|extract.?transform.?load)[^A-zæøå])"]
-                   ["SaaS" #"(?i)([^A-zæøå](saas|software.?as.?a.?service)[^A-zæøå])"]
+                   ["SaaS" #"(?i)([^A-zæøå](saas|(software.?as.?a.?service))[^A-zæøå])"]
                    ["Cloud" #"(?i)([^A-zæøå](cloud|sky(en|basert)?)[^A-zæøå])"]
                    ["Frontend" #"(?i)front.?end"]
                    ["Backend" #"(?i)back.?end"]
                    ["Fullstack" #"(?i)full.?stack"]
                    ["Devops" #"(?i)[^A-zæøå](dev.?ops)"]
                    ["TensorFlow" #"(?i)[^A-zæøå](tensor.?flow)"]
-                   ["Business Intelligence" #"(?i)([^A-zæøå](BI|Business.?Intelligence)[^A-zæøå])"]
+                   ["BI" #"(?i)([^A-zæøå](BI|Business.?Intelligence)[^A-zæøå])"]
                    ["iOS" #"(?i)([^A-zæøå]iOS[^A-zæøå])"]
                    ["Android" #"(?i)[^A-zæøå]Android"]
                    ["Gradle" #"(?i)([^A-zæøå](gradle)[^A-zæøå])"]
@@ -128,6 +133,8 @@
                    ["MATLAB" #"(?i)([^A-zæøå]matlab[^A-zæøå])"]
                    ["JBuilder" #"(?i)([^A-zæøå]jbuilder[^A-zæøå])"]
                    ["JRules" #"(?i)([^A-zæøå]jrules[^A-zæøå])"]
+                   ["ILOG" #"(?i)([^A-zæøå]ILOG[^A-zæøå])"]
+                   ["Fortran" #"(?i)([^A-zæøå]Fortran[^A-zæøå])"]
                    ["CRM" #"(?i)([^A-zæøå]CRM[^A-zæøå])"]
                    ["ERP" #"(?i)([^A-zæøå]ERP[^A-zæøå])"]
                    ["CRM" #"(?i)([^A-zæøå]CRM[^A-zæøå])"]
@@ -205,8 +212,6 @@
   (->> (csv/parse-csv (slurp path) :delimiter \;)
        (csv-data->maps)
        (map rename-keys-ads)
-       (filter #(= (:proffesion_group %) "Ingeniør- og ikt-fag (2001-2011)"))
-       (map #(update % :proffesion_group (fn [v] "Ingeniør- og ikt-fag")))
        (distinct-by :ad_id)
        (remove #(nil? (:ad_id %)))))
 
@@ -218,25 +223,86 @@
        (remove #(nil? (:ad_id %)))
        (map #(update % :description clean-html))))
 
-(defn pop-by-year []
-  (->> (sql/query db ["select keyword, c as freq,j.year, round((c::numeric)/(c2::numeric),4)*100 as precent, array_agg(distinct ads.orgnr) from (\nselect keyword, year, count(keyword) as c \nfrom keywords\ninner join ads on keywords.ad_id = ads.ad_id\ngroup by year, keyword\norder by c desc ) j\ninner join (select count(ads.ad_id) c2, year from ads group by year) j2 on j2.year = j.year\ninner join ads on j.year = ads.year and j.keyword in (select keyword from keywords where keywords.ad_id = ads.ad_id) \ngroup by keyword, freq, j.year, precent\norder by year asc"])
+
+((defn save-descs-from-ids []
+   (filter #(contains? (json/read-str (slurp "resources/ids")) (:ad_id %)) (read-descs "resources/texts/2018_2.csv")))
+
+
+(defn save-not-saved-ads [path]
+  (ads-in (let [b  (set (map :ad_id (sql/query db ["select ad_id from ads"])))
+                c (set (map :proffesion_code (sql/query db ["select proffesion_code from ads"])))
+                ]
+            (->> (read-ads path)
+                 (remove #(contains? b (:ad_id %)))
+                 (filter #(contains? c (:proffesion_code %)))
+                 (filter #(= "Ingeniør- og ikt-fag" (:proffesion_group %)))
+                 )
+            )))
+
+(defn q-keywords []
+  (->> (sql/query db ["select keyword, \nc as freq,\nj.year, \nround((c::numeric)/(c2::numeric),4)*100 as percent, \nround((c::numeric)/(c3::numeric),4)*100 as percent_all, \narray_agg(distinct ads.business_orgnr) as business_orgnumbers \nfrom (select keyword, year, count(keyword) as c \n\t  from keywords\n\t  inner join ads on keywords.ad_id = ads.ad_id\n\t  group by year, keyword order by c desc ) j\n\t  inner join (select count(ads.ad_id) c2, year \n\t\t\t\t  from ads \n\t\t\t\t  where ad_id in (select ad_id from keywords) \n\t\t\t\t  group by year) j2 on j2.year = j.year\n\t  inner join (select count(ads.ad_id) c3, year \n\t\t\t\t  from ads\n\t\t\t\t  group by year) j3 on j3.year = j.year\n\t  inner join ads on j.year = ads.year and j.keyword in (select keyword from keywords where keywords.ad_id = ads.ad_id) \ngroup by keyword, freq, j.year, percent, percent_all\norder by year asc"])
        (group-by :keyword)))
 
-(defn pop-by-year-w []
-  (->> (sql/query db ["select keyword, c as freq,j.year, round((c::numeric)/(c2::numeric),4)*100 as precent, array_agg(distinct ads.orgnr) from (\nselect keyword, year, count(keyword) as c \nfrom keywords\ninner join ads on keywords.ad_id = ads.ad_id\ngroup by year, keyword\norder by c desc ) j\ninner join (select count(ads.ad_id) c2, year from ads where ad_id in (select ad_id from keywords) group by year) j2 on j2.year = j.year\ninner join ads on j.year = ads.year and j.keyword in (select keyword from keywords where keywords.ad_id = ads.ad_id) \ngroup by keyword, freq, j.year, precent\norder by year asc"])
-       (group-by :keyword)))
+(defn q-firms []
+  (sql/query db ["select a.orgnr as business_orgnr,
+                 array_agg(distinct a.org_name) as business_names,
+                 array_agg(distinct k.keyword) as keywords,
+                 array_agg(distinct a.fylke) as fylker,
+                 array_agg(distinct a.kommune) as kommuner,
+                 count(a.ad_id) as ads_posted
+                 from keywords k inner join ads a on a.ad_id = k.ad_id
+                 where a.business_orgnr != ''
+                 group by a.orgnr
+                 order by orgnr "]))
 
+(defn q-businesses []
+  (sql/query db ["select a.business_orgnr as business_orgnr,
+                 array_agg(distinct a.business_name) as business_names,
+                 array_agg(distinct k.keyword) as keywords,
+                 array_agg(distinct a.fylke) as fylker,
+                 array_agg(distinct a.kommune) as kommuner,
+                 count(a.ad_id) as ads_posted
+                 from keywords k inner join ads a on a.ad_id = k.ad_id
+                 where a.business_orgnr != ''
+                 group by a.business_orgnr
+                 order by business_orgnr"]))
+
+(defn q-kommuner []
+  (keywordize-keys (apply merge (map #(assoc '{} (:fylke %) (:kommuner %)) (sql/query db ["select fylke, array_agg(distinct kommune) as kommuner from ads\ngroup by fylke"])))))
+
+(defn q-fylker []
+  (:fylker (first (sql/query db ["select array_agg( distinct a.fylke) as fylker\n  from ads a where a.ad_id in (select ad_id from keywords)\n    and a.business_orgnr != ''\n\t\t\t\t and a.fylke not in ('*', 'ENT')"]))))
+
+
+(defn q-keywords-plain []
+  (map :keyword (sql/query db ["select distinct keyword from keywords"])))
 
 (defroutes app
-           (GET "/popularity-year/" []
+           (GET "/keywords/" []
              {:status  200
               :headers {"Content-Type" "application/json" "Access-Control-Allow-Origin" "*"}
-              :body    (json/write-str (pop-by-year))})
-           (GET "/popularity-year-w/" []
+              :body    (json/write-str (q-keywords))})
+           (GET "/businesses/" []
              {:status  200
               :headers {"Content-Type" "application/json" "Access-Control-Allow-Origin" "*"}
-              :body    (json/write-str (pop-by-year-w))})
+              :body    (json/write-str (q-businesses))})
+           (GET "/keywords-plain/" []
+             {:status  200
+              :headers {"Content-Type" "application/json" "Access-Control-Allow-Origin" "*"}
+              :body    (json/write-str (q-keywords-plain))})
            (route/not-found "<h1>Page not found</h1>"))
+
+(defn save-json [f m]
+  (spit (str "resources/db/" f) (json/write-str m)))
+
+(defn save-all []
+  (do
+    (save-json "fylker" (q-fylker))
+    (save-json "kommuner" (q-kommuner))
+    (save-json "businesses" (q-businesses))
+    (save-json "keywordsplain" (q-keywords-plain))
+    (save-json "keywords" (q-keywords))
+    (save-json "firms" (q-firms))))
 
 
 (defn create-server []
