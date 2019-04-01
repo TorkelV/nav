@@ -7,8 +7,10 @@
             [clojure.data.json :as json]
             [clojure.java.jdbc :as sql]
             [clojure.string :as cstr]
+            [clojure.data.csv :as csv2]
             [clojure-csv.core :as csv]
-            [compojure.route :as route]))
+            [compojure.route :as route]
+            [clojure.java.io :as io]))
 
 (def db "postgresql://localhost:5432/nav?user=postgres&password=123")
 
@@ -39,7 +41,6 @@
 (defn csv-data->maps [csv-data]
   (map #(zipmap (first csv-data) %)
        (rest csv-data)))
-
 
 (def re-keywords '[["Java" #"(?i)[^A-zæøå]java[^s]"]
                    ["JavaScript" #"(?i)javascript|([^A-zæøå]JS[^A-zæøå@])"]
@@ -137,7 +138,6 @@
                    ["Fortran" #"(?i)([^A-zæøå]Fortran[^A-zæøå])"]
                    ["CRM" #"(?i)([^A-zæøå]CRM[^A-zæøå])"]
                    ["ERP" #"(?i)([^A-zæøå]ERP[^A-zæøå])"]
-                   ["CRM" #"(?i)([^A-zæøå]CRM[^A-zæøå])"]
                    ["IBM" #"(?i)([^A-zæøå]IBM[^A-zæøå])"]
                    ["PLC" #"(?i)([^A-zæøå](PLS|PLC)[^A-zæøå])"]
                    ["Powershell" #"(?i)([^A-zæøå](Powershell)[^A-zæøå])"]
@@ -148,11 +148,12 @@
 
 
 (defn save-keywords [keywords]
-  (let [a (sql/query db ["select ad_id, concat(title,' ',description) as description from descs"])]
+  (let [a (sql/query db ["select ad_id, concat(title,' ',description) as description from descs where ad_id not in (select distinct ad_id from keywords)"])]
     (->> (map #(vec [(first %) (map :ad_id (filter-ads-regex (last %) :description a))]) keywords)
          (map (fn [v] (map #(assoc '{} :keyword (first v) :ad_id %) (last v))))
          (apply concat)
-         (sql/insert-multi! db :keywords))))
+         (sql/insert-multi! db :keywords)
+         )))
 
 (defn rename-keys-ads [ads]
   (clojure.set/rename-keys ads {"Bedrift Naring Primar Kode" :industry_code
@@ -197,6 +198,7 @@
 
 
 
+
 (defn clean-html [t]
   (-> t
       (cstr/replace #"<[^>]*>" " ")
@@ -224,12 +226,23 @@
        (map #(update % :description clean-html))))
 
 
-((defn save-descs-from-ids []
-   (filter #(contains? (json/read-str (slurp "resources/ids")) (:ad_id %)) (read-descs "resources/texts/2018_2.csv")))
+(defn read-descs2 [path]
+  (->> (with-open [reader (io/reader path)]
+         (csv-data->maps (doall
+                           (csv2/read-csv reader :separator \;))))
+       (map rename-keys-texts)
+       (distinct-by :ad_id)
+       (remove #(nil? (:ad_id %)))
+       (map #(update % :description clean-html))))
+
+
+(defn save-descs-from-ids []
+  (descs-in (filter #(contains? (set (json/read-str (slurp "resources/ids"))) (:ad_id %))
+          (read-descs2 "resources/texts/2018_2.csv"))))
 
 
 (defn save-not-saved-ads [path]
-  (ads-in (let [b  (set (map :ad_id (sql/query db ["select ad_id from ads"])))
+  (ads-in (let [b (set (map :ad_id (sql/query db ["select ad_id from ads"])))
                 c (set (map :proffesion_code (sql/query db ["select proffesion_code from ads"])))
                 ]
             (->> (read-ads path)
@@ -251,7 +264,7 @@
                  array_agg(distinct a.kommune) as kommuner,
                  count(a.ad_id) as ads_posted
                  from keywords k inner join ads a on a.ad_id = k.ad_id
-                 where a.business_orgnr != ''
+                 where a.business_orgnr != '' and business_orgnr!='*'
                  group by a.orgnr
                  order by orgnr "]))
 
@@ -263,7 +276,7 @@
                  array_agg(distinct a.kommune) as kommuner,
                  count(a.ad_id) as ads_posted
                  from keywords k inner join ads a on a.ad_id = k.ad_id
-                 where a.business_orgnr != ''
+                 where a.business_orgnr != '' and business_orgnr!='*'
                  group by a.business_orgnr
                  order by business_orgnr"]))
 
